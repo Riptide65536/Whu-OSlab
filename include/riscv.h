@@ -299,32 +299,41 @@ w_pmpaddr0(uint64 x)
 
 // 内存管理相关
 
-#define PGSIZE 4096 // bytes per page
-#define PGSHIFT 12  // bits of offset within a page
+// 页表大小和相关计算
+#define PGSIZE 4096 // 每页占4KB
+#define PGSHIFT 12  // 业内偏移的位数
 
 #define PG_ROUND_UP(sz)  (((sz)+PGSIZE-1) & ~(PGSIZE-1))
 #define PG_ROUND_DOWN(a) (((a)) & ~(PGSIZE-1))
 
-#define PTE_V (1L << 0) // valid
-#define PTE_R (1L << 1)
-#define PTE_W (1L << 2)
-#define PTE_X (1L << 3)
-#define PTE_U (1L << 4) // 1 -> user can access
+// 获取虚拟地址中的虚拟页(VPN)信息 占9bit
+#define PXMASK                  0x1FF // 9 bits
+#define VA_SHIFT(level)         (PGSHIFT + 9 * (level))
+#define VA_TO_VPN(va,level)     ((((uint64)(va)) >> VA_SHIFT(level)) & PXMASK)
 
-// shift a physical address to the right place for a PTE.
-#define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
+// PA和PTE之间的转换
+#define PA_TO_PTE(pa) ((((uint64)(pa)) >> 12) << 10)
+#define PTE_TO_PA(pte) (((pte) >> 10) << 12)
 
-#define PTE2PA(pte) (((pte) >> 10) << 12)
+// 页面权限控制 
+#define PTE_V (1 << 0) // valid
+#define PTE_R (1 << 1) // read
+#define PTE_W (1 << 2) // write
+#define PTE_X (1 << 3) // execute
+#define PTE_U (1 << 4) // user (1 -> user can access)
+#define PTE_G (1 << 5) // global
+#define PTE_A (1 << 6) // accessed
+#define PTE_D (1 << 7) // dirty
 
+// 检查一个PTE是否属于pgtbl
+#define PTE_CHECK(pte) (((pte) & (PTE_R | PTE_W | PTE_X)) == 0)
+
+// 获取低10bit的flag信息
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
 
-// extract the three 9-bit page table indices from a virtual address.
-#define PXMASK          0x1FF // 9 bits
-#define PXSHIFT(level)  (PGSHIFT+(9*(level)))
-#define PX(level, va)   ((((uint64) (va)) >> PXSHIFT(level)) & PXMASK)
-
+// 定义一个相当大的VA, 规定所有VA不得大于它
 // one beyond the highest possible virtual address.
 // MAXVA is actually one bit less than the max allowed by
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
-#define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+#define VA_MAX (1ul << 38)

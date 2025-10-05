@@ -7,6 +7,13 @@
         "uart.h": "c",
         "print.h": "c",
         "riscv.h": "c",
-        "mutex": "c"
+        "mutex": "c",
+        "array": "c",
+        "deque": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "vector": "c",
+        "string_view": "c",
+        "initializer_list": "c"
     }
 }

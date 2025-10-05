@@ -91,3 +91,10 @@ void uart_intr(void)
     uart_putc_sync(c);
   }
 }
+
+// 发送一个以 '\0' 结尾的字符串
+void uart_puts(char *s) {
+    while (*s) {
+        uart_putc_sync(*s++);
+    }
+}

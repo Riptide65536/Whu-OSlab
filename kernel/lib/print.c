@@ -27,12 +27,12 @@ printint(int xx, int base, int sign)
 {
   char buf[16];
   int i;
-  uint32 x; // 这里调整，加大位宽
+
+  // 这里调整，加大位宽，防止极端情况
+  uint64 x = xx;
 
   if(sign && (sign = xx < 0))
-    x = -xx;
-  else
-    x = xx;
+    x = -x;
 
   i = 0;
   do {
@@ -95,6 +95,9 @@ void printf(const char *fmt, ...)
       for(; *s; s++)
         uart_putc_sync(*s);
       break;
+    case 'c':
+      uart_putc_sync(va_arg(ap, int));
+      break;
     case '%':
       uart_putc_sync('%');
       break;
@@ -127,4 +130,15 @@ void assert(bool condition, const char* warning)
     if(!condition){
         panic(warning);
     }
+}
+
+// 清屏函数实现
+void clear_screen(void) {
+    // 发送ANSI转义序列: \033 是 ESC 的八进制表示
+    // [2J 表示清除整个屏幕
+    uart_puts("\033[2J"); 
+    // [H 表示将光标移动到左上角
+    uart_puts("\033[H");
+
+    printf("Screen cleared\n");
 }

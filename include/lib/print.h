@@ -7,5 +7,6 @@ void print_init(void);
 void printf(const char* fmt, ...);
 void panic(const char* warning);
 void assert(bool condition, const char* warning);
+void clear_screen(void);
 
 #endif

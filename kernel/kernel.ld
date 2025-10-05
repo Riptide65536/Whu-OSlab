@@ -15,6 +15,7 @@ SECTIONS
     ASSERT(. - _trampoline == 0x1000, "error: trampoline larger than one page");
     */
     PROVIDE(etext = .);
+    PROVIDE(KERNEL_DATA = .);
   }
 
   .rodata : {
@@ -39,4 +40,11 @@ SECTIONS
   }
 
   PROVIDE(end = .);
+
+  /* 对齐到页边界，并定义 ALLOC_BEGIN */
+  . = ALIGN(0x1000);
+  PROVIDE(ALLOC_BEGIN = .);
+
+  /* 定义 ALLOC_END 基于物理内存结束地址（例如 128MB 的结束地址 0x88000000） */
+  PROVIDE(ALLOC_END = 0x88000000);
 }
