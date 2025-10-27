@@ -56,7 +56,7 @@ printptr(uint64 x)
     uart_putc_sync(digits[x >> (sizeof(uint64) * 8 - 4)]);
 }
 
-// Print to the console. only understands %d, %x, %p, %s.
+// 将格式化字符输出到中断。支持%d, %x, %p, %s, %c。
 void printf(const char *fmt, ...)
 {
   va_list ap;

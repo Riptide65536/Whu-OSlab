@@ -1,4 +1,5 @@
 #include "riscv.h"
+#include "dev/timer.h"
 
 __attribute__ ((aligned (16))) uint8 CPU_stack[4096 * NCPU];
 
@@ -20,15 +21,18 @@ void start()
     // 把mepc设为main函数的地址
     w_mepc((uint64)main);
 
-    // 关闭所有中断和异常，从而使得
-    // w_medeleg(0xffff);
-    // w_mideleg(0xffff);
-    // w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
+    // 关闭所有中断和异常
+    w_medeleg(0xffff);
+    w_mideleg(0xffff);
+    w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
     // 物理内存设置，从而设置到S模式
     // 能够访问所有物理内存
     w_pmpaddr0(0x3fffffffffffffull);
     w_pmpcfg0(0xf);
+
+    // 请求时钟中断的启动
+    timer_init();
 
     // 将每个CPU的hartid存放在寄存器中，从而供cpuid()使用
     int id = r_mhartid();
