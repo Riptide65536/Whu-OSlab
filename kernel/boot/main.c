@@ -4,6 +4,7 @@
 #include "lib/str.h"
 #include "mem/pmem.h"
 #include "mem/kvm.h"
+#include "proc/proc.h"
 #include "trap/trap.h"
 
 volatile static int started = 0;
@@ -16,10 +17,12 @@ void main()
         pmem_init();
         kvm_init();
         kvm_inithart();
+        // procinit();      // 进程表
         trap_kernel_init();
         trap_kernel_inithart();
         plic_init();
         plic_inithart();
+        proc_make_first();
 
         printf("cpu %d is booting!\n", cpuid);
         __sync_synchronize();

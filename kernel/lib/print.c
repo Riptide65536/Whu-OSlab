@@ -29,7 +29,7 @@ printint(int xx, int base, int sign)
   int i;
 
   // 这里调整，加大位宽，防止极端情况
-  uint64 x = xx;
+  int64 x = xx;
 
   if(sign && (sign = xx < 0))
     x = -x;
@@ -60,7 +60,8 @@ printptr(uint64 x)
 void printf(const char *fmt, ...)
 {
   va_list ap;
-  int i, c, locking;
+  int64 i;
+  int c, locking;
   char *s;
 
   locking = pr.locking;

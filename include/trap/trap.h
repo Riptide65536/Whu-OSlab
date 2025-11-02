@@ -17,8 +17,10 @@ void trap_kernel_init();
 void trap_kernel_inithart();
 void trap_kernel_handler();
 
-// 辅助函数: 外设中断和时钟中断处理
+void trap_user_handler();
+void trap_user_return();
 
+// 辅助函数: 外设中断和时钟中断处理
 void external_interrupt_handler();
 void timer_interrupt_handler();
 
