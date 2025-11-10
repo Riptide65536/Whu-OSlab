@@ -23,7 +23,7 @@ void print_init(void)
 
 // 辅助函数
 static void
-printint(int xx, int base, int sign)
+printint(int64 xx, int base, int sign)
 {
   char buf[16];
   int i;
@@ -31,7 +31,7 @@ printint(int xx, int base, int sign)
   // 这里调整，加大位宽，防止极端情况
   int64 x = xx;
 
-  if(sign && (sign = xx < 0))
+  if(sign && (sign = xx < (int64)0))
     x = -x;
 
   i = 0;

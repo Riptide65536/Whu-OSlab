@@ -72,6 +72,9 @@ void* pmem_alloc(bool in_kernel){
 
     spinlock_release(&region->lk); // 解锁
 
+    // 将垃圾填入，防止额外定义
+    memset(page, 5, PGSIZE);
+
     return (void*)page;
 }
 
@@ -83,6 +86,9 @@ void  pmem_free(uint64 page, bool in_kernel){
 
     alloc_region_t *region = in_kernel ? &kern_region : &user_region;
     page_node_t *page_ptr = (page_node_t *)page;
+
+    // 将垃圾填入，防止额外定义
+    memset((char*)page, 1, PGSIZE);
     
     spinlock_acquire(&region->lk); // 上锁
 
@@ -91,4 +97,20 @@ void  pmem_free(uint64 page, bool in_kernel){
     region->allocable++;
     
     spinlock_release(&region->lk); // 解锁
+}
+
+// 不用判断物理地址的物理页释放
+// 自动由物理地址判断属于哪个链表
+void pmem_free_auto(uint64 page){
+    bool atKernel = kern_region.begin <= page && page < kern_region.end;
+    bool atUser = user_region.begin <= page && page < user_region.end;
+    if(atKernel){
+        pmem_free(page, 1);
+    }
+    else if(atUser){
+        pmem_free(page, 0);
+    }
+    else{
+        panic("pmem_free: Don't know where pysical page is.");
+    }
 }

@@ -1,8 +1,9 @@
 #include "lib/print.h"
 #include "trap/trap.h"
-#include "proc/cpu.h"
-#include "mem/kvm.h"
+#include "mem/vmem.h"
 #include "memlayout.h"
+#include "proc/cpu.h"
+#include "syscall/syscall.h"
 #include "riscv.h"
 
 // in trampoline.S
@@ -49,23 +50,21 @@ void trap_user_handler()
         // sepc points to the ecall instruction,
         // but we want to return to the next instruction.
         p->tf->epc += 4;
-        printf("get a syscall from proc %d\n", p->pid);
-
-        // syscall();
 
         // an interrupt will change sepc, scause, and sstatus,
         // so enable only now that we're done with those registers.
         intr_on();
 
+        syscall();
     } else if (isInterrupt) {
         switch (trap_id)
         {
         case 1:
-            // 处理软件中断
+            // 处理时钟中断
             timer_interrupt_handler();
             break;
         case 5:
-            // 处理时钟中断
+            // 处理计时器中断
             // Pass anyway...
             break;
         case 9:

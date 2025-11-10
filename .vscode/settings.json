@@ -16,6 +16,9 @@
         "string_view": "c",
         "initializer_list": "c",
         "trap.h": "c",
-        "plic.h": "c"
+        "plic.h": "c",
+        "syscall_arch.h": "c",
+        "timer.h": "c",
+        "memlayout.h": "c"
     }
 }

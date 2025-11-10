@@ -1,7 +1,7 @@
 #include "lib/print.h"
 #include "lib/str.h"
 #include "mem/pmem.h"
-#include "mem/kvm.h"
+#include "mem/vmem.h"
 #include "proc/proc.h"
 #include "common.h"
 #include "memlayout.h"
@@ -13,7 +13,9 @@ extern char etext[]; // kernel.ld设置的etext段
 
 extern char trampoline[]; // trampoline.S
 
-void vm_print_helper(pgtbl_t pgtbl, int level){
+// 递归输出页表的对应内容
+// ps: 顶级页表level = 0, level = 3 说明是页表管理的物理页
+static void vm_print_helper(pgtbl_t pgtbl, int level){
     for(int i=0; i<512; i++){
         pte_t *pte = &pgtbl[i];
         pgtbl_t pa = (pgtbl_t)PTE_TO_PA(*pte);
@@ -43,6 +45,22 @@ pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc){
         }
   }
   return &pgtbl[VA_TO_VPN(va, 0)];
+}
+
+// 同xv6中的walkaddr，返回虚拟地址在页表中对应的物理地址
+// 如果没有映射或不可用，返回0
+// 仅能用于查看用户页
+uint64 vm_getpa(pgtbl_t pgtbl, uint64 va){
+    if(va >= VA_MAX) return 0;
+
+    pte_t* pte = vm_getpte(pgtbl, va, 0);
+    if(pte == 0)
+        return 0;
+    else if((*pte & PTE_V) == 0 || (*pte & PTE_U) == 0)
+        return 0;
+    
+    uint64 pa = PTE_TO_PA(*pte);
+    return pa;
 }
 
 void   vm_mappages(pgtbl_t pgtbl, uint64 va, uint64 pa, uint64 len, int perm){

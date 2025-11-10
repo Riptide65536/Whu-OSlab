@@ -3,7 +3,7 @@
 #include "lib/print.h"
 #include "lib/str.h"
 #include "mem/pmem.h"
-#include "mem/kvm.h"
+#include "mem/vmem.h"
 #include "proc/proc.h"
 #include "trap/trap.h"
 
