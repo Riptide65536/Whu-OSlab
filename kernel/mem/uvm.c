@@ -100,11 +100,34 @@ void uvm_destroy_pgtbl(pgtbl_t pgtbl)
 // 拷贝页表 (拷贝并不包括trapframe 和 trampoline)
 void uvm_copy_pgtbl(pgtbl_t old, pgtbl_t new, uint64 heap_top, uint32 ustack_pages, mmap_region_t* mmap)
 {
+    pte_t *pte;
+    uint64 pa, va;
+    uint8 flags;
+    char *mem;
+
     /* step-1: USER_BASE ~ heap_top */
+    for(va = 0; va < heap_top; va += PGSIZE){
+        if((pte = vm_getpte(old, va, 0)) == 0)
+            panic("uvmcopy: pte should exist");
+        if((*pte & PTE_V) == 0)
+            panic("uvmcopy: page not present");
+        pa = PTE_TO_PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if((mem = pmem_alloc(false)) == 0){
+            vm_unmappages(new, 0, va / PGSIZE, 1);
+            printf("uvmcopy warning: mem alloc failed");
+        }
+        memmove(mem, (char*)pa, PGSIZE);
+
+        vm_mappages(new, va, (uint64)mem, PGSIZE, flags);
+    }
 
     /* step-2: ustack */
+    // 由于每个进程都有对应的映射用户栈（proc_mapstacks已配备）
+    // 目前暂时不用处理此部分，因为用户栈和用户代码共用一页    
 
     /* step-3: mmap_region */
+    // 这部分未涉及mmap的东西，所以不写
 }
 
 // 在用户页表和进程mmap链里 新增mmap区域 [begin, begin + npages * PGSIZE)
@@ -144,13 +167,13 @@ uint64 uvm_heap_grow(pgtbl_t pgtbl, uint64 heap_top, uint32 len)
     heap_top = PG_ROUND_UP(heap_top);
     uint64 new_heap_top = heap_top + len;
     for(a = heap_top; a < new_heap_top; a += PGSIZE){
-        mem = pmem_alloc(0);
+        mem = pmem_alloc(false);
         if(mem == 0){
             uvm_heap_ungrow(pgtbl, a, a - heap_top);
             return -1;
         }
         memset(mem, 0, PGSIZE);
-        vm_mappages(pgtbl, a, (uint64)mem, PGSIZE, PTE_R|PTE_U);
+        vm_mappages(pgtbl, a, (uint64)mem, PGSIZE, PTE_W|PTE_R|PTE_U);
     }
 
     myproc()->heap_top = new_heap_top;
@@ -175,7 +198,7 @@ uint64 uvm_heap_ungrow(pgtbl_t pgtbl, uint64 heap_top, uint32 len)
 // 注意: src dst 不一定是 page-aligned
 void uvm_copyin(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len)
 {
-  uint64 n, va0, pa0;
+    uint64 n, va0, pa0;
 
     while(len > 0){
         va0 = PG_ROUND_DOWN(src);
@@ -198,17 +221,17 @@ void uvm_copyout(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len)
     uint64 n, va0, pa0;
 
     while(len > 0){
-        va0 = PG_ROUND_DOWN(src);
+        va0 = PG_ROUND_DOWN(dst);
         pa0 = vm_getpa(pgtbl, va0);
         if(pa0 == 0) return;
-        n = PGSIZE - (src - va0);
+        n = PGSIZE - (dst - va0);
         if(n > len)
             n = len;
-        memmove((char *)dst, (void *)(pa0 + (src - va0)), n);
+        memmove((void *)(pa0 + (dst - va0)), (char *)src, n);
 
         len -= n;
-        dst += n;
-        src = va0 + PGSIZE;
+        src += n;
+        dst = va0 + PGSIZE;
     }
 }
 

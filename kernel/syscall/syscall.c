@@ -9,12 +9,16 @@
 // 系统调用跳转
 static uint64 (*syscalls[])(void) = {
     [SYS_test]          sys_test,
+    [SYS_print]         sys_print,
     [SYS_brk]           sys_brk,
     [SYS_mmap]          sys_mmap,
     [SYS_munmap]        sys_munmap,
-    [SYS_copyin]        sys_copyin,
-    [SYS_copyout]       sys_copyout,
-    [SYS_copyinstr]     sys_copyinstr,
+    [SYS_fork]          sys_fork,
+    [SYS_wait]          sys_wait,
+    [SYS_exit]          sys_exit,
+    [SYS_sleep]         sys_sleep,
+    [SYS_kill]          sys_kill,
+    [SYS_getpid]        sys_getpid,
 };
 
 // 定长数组的宏定义
@@ -66,6 +70,12 @@ static uint64 arg_raw(int n)
             panic("arg_raw: illegal arg num");
             return -1;
     }
+}
+
+// 读取 n 号参数，作为正常的 int 存储
+void arg_int(int n, int* ip)
+{
+    *ip = arg_raw(n);
 }
 
 // 读取 n 号参数, 作为 uint32 存储

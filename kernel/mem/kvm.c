@@ -32,6 +32,22 @@ void   vm_print(pgtbl_t pgtbl){
     vm_print_helper(pgtbl, 0);
 }
 
+void vm_getpteprint(pgtbl_t pgtbl, uint64 va, bool alloc){
+    for(int level = 2; level > 0; level--) {
+        pte_t *pte = &pgtbl[VA_TO_VPN(va, level)];
+        printf("pte debug %p *:%p\n",pte,*pte);
+        if(*pte & PTE_V) {
+            pgtbl = (pgtbl_t)PTE_TO_PA(*pte);
+        } else {
+            if(!alloc || (pgtbl = (pte_t*)pmem_alloc(true)) == 0)
+                return;
+            memset(pgtbl, 0, PGSIZE);
+            *pte = PA_TO_PTE(pgtbl) | PTE_V;
+        }
+  }
+  return;
+}
+
 pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc){
     for(int level = 2; level > 0; level--) {
         pte_t *pte = &pgtbl[VA_TO_VPN(va, level)];
@@ -45,6 +61,19 @@ pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc){
         }
   }
   return &pgtbl[VA_TO_VPN(va, 0)];
+}
+
+uint64 vm_getpakernel(pgtbl_t pgtbl, uint64 va){
+    if(va >= VA_MAX) return 0;
+
+    pte_t* pte = vm_getpte(pgtbl, va, 0);
+    if(pte == 0)
+        return 0;
+    else if((*pte & PTE_V) == 0 )
+        return 0;
+    
+    uint64 pa = PTE_TO_PA(*pte);
+    return pa;
 }
 
 // 同xv6中的walkaddr，返回虚拟地址在页表中对应的物理地址
@@ -101,7 +130,7 @@ void   vm_unmappages(pgtbl_t pgtbl, uint64 va, uint64 len, bool freeit){
             panic("uvmunmap: not a leaf");
         if(freeit){
             uint64 pa = PTE_TO_PA(*pte);
-            pmem_free(pa, true);
+            pmem_free_auto(pa);
         }
         *pte = 0;
     }

@@ -17,7 +17,7 @@ void main()
         pmem_init();
         kvm_init();
         kvm_inithart();
-        // procinit();      // 进程表
+        proc_init();
         trap_kernel_init();
         trap_kernel_inithart();
         plic_init();
@@ -36,8 +36,7 @@ void main()
         kvm_inithart();
         trap_kernel_inithart();
         plic_inithart();
-        
     }
-    intr_on();
-    while(1);
+
+    proc_scheduler();
 }

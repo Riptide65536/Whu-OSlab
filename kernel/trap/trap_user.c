@@ -45,7 +45,7 @@ void trap_user_handler()
 
     if(scause == 8){
         // system call
-        // if(killed(p)) exit(-1);
+        if(proc_killed(p)) proc_exit(-1);
 
         // sepc points to the ecall instruction,
         // but we want to return to the next instruction.
@@ -62,10 +62,7 @@ void trap_user_handler()
         case 1:
             // 处理时钟中断
             timer_interrupt_handler();
-            break;
-        case 5:
-            // 处理计时器中断
-            // Pass anyway...
+            proc_yield();
             break;
         case 9:
             // 处理外部中断
@@ -86,8 +83,10 @@ void trap_user_handler()
         printf("            scause %p\n", scause);
         printf("            sepc=%p stval=%p\n", sepc, stval);
         panic("usertrap: unexpected exception");
-        // setkilled(p);
+        proc_setkilled(p);
     }
+
+    if(proc_killed(p)) proc_exit(-1);
 
     trap_user_return();
 }

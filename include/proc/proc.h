@@ -2,6 +2,7 @@
 #define __PROC_H__
 
 #include "common.h"
+#include "lib/lock.h"
 
 // 页表类型定义
 typedef uint64* pgtbl_t;
@@ -67,10 +68,41 @@ typedef struct trapframe {
     /* 280 */ uint64 t6;
 } trapframe_t;
 
+/* 
+    进程状态集合
+    可能的进程状态变换：
+    UNSED -> RUNNABLE 进程初始化
+    RUNNABLE -> RUNNIGN 进程获得CPU使用权
+    RUNNING -> RUNNABLE 进程失去CPU使用权
+    RUNNING -> SLEEPING 进程睡眠
+    SLEEPING -> RUNNABLE 进程苏醒
+    RUNNING -> ZOMBIE 进程杀死自己
+    RUNNABLE -> ZOMBIE 进程被杀死
+    ZOMBIE -> UNUSED 进程被父进程释放回收
+*/
+enum proc_state {
+    UNUSED,       // 未被使用
+    RUNNABLE,     // 准备就绪
+    RUNNING,      // 运行中
+    SLEEPING,     // 睡眠等待
+    ZOMBIE,       // 濒临死亡
+};
+
 // 进程定义
 typedef struct proc {
-    int pid;                 // 标识符
+    spinlock_t lk;         // 自旋锁
 
+    // 使用前需要持有p->lock才能访问
+    int pid;                 // 标识符
+    enum proc_state state;    // 进程状态
+    void* sleep_space;       // 睡眠是为在等待什么
+    int xstate;              // 进程退出时的状态
+    bool killed;              // 是否已被杀死（功能有待扩展）
+    
+    // 使用前需要持有wait_lock才能访问
+    struct proc *parent;     // 父进程
+
+    // 每个进程独立的数据，访问时无需上锁
     pgtbl_t pgtbl;           // 用户态页表
     uint64 heap_top;         // 用户堆顶(以字节为单位)
     uint64 ustack_pages;     // 用户栈占用的页面数量
@@ -81,8 +113,21 @@ typedef struct proc {
 } proc_t;
 
 
-void proc_mapstacks(pgtbl_t kpgtbl);    // 在内核中映射栈部分的内存
-pgtbl_t  proc_pgtbl_init(uint64 trapframe); // 进程页表的初始化和基本映射
-void     proc_make_first();                 // 创建第一个进程并切换到它执行
-    
+void     proc_init();                                  // 进程模块初始化
+void     proc_make_first();                            // 创建第一个进程并切换到它执行
+void     proc_mapstacks(pgtbl_t kpgtbl);               // 在内核中映射栈部分的内存
+pgtbl_t  proc_pgtbl_init(uint64 trapframe);            // 进程页表的初始化和基本映射
+proc_t*  proc_alloc();                                 // 进程申请
+void     proc_free(proc_t* p);                         // 进程释放
+int      proc_fork();                                  // 复制子进程
+int      proc_wait(uint64 addr);                       // 等待子进程退出
+void     proc_exit(int exit_state);                    // 进程退出
+void     proc_yield();                                 // 进程放弃CPU
+void     proc_sleep(void* sleep_space, spinlock_t* lk);// 进程睡眠
+void     proc_wakeup(void* sleep_space);               // 进程唤醒
+int      proc_kill(int pid);                           // 杀死一个进程
+void     proc_setkilled(proc_t *p);                    // 将进程修改为已杀死状态
+bool     proc_killed(proc_t *proc);                    // 进程是否已经被杀死
+void     proc_sched();                                 // 进程切换到调度器
+void     proc_scheduler();                             // 调度器
 #endif

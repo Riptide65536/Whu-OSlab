@@ -19,6 +19,10 @@
         "plic.h": "c",
         "syscall_arch.h": "c",
         "timer.h": "c",
-        "memlayout.h": "c"
+        "memlayout.h": "c",
+        "proc.h": "c",
+        "vmem.h": "c",
+        "sysnum.h": "c",
+        "random": "c"
     }
 }

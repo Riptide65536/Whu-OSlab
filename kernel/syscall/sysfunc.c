@@ -4,14 +4,27 @@
 #include "mem/mmap.h"
 #include "lib/str.h"
 #include "lib/print.h"
+#include "dev/timer.h"
 #include "syscall/sysfunc.h"
 #include "syscall/syscall.h"
+#include "riscv.h"
 
 // 系统调用测试（无功能）
 // 输出一行调试信息，然后返回0
 uint64 sys_test()
 {
     printf("System call test here.\n");
+    return 0;
+}
+
+// 输出对应的信息
+// char* message 需要输出的信息（无格式）
+// 输出message，之后返回0
+uint64 sys_print()
+{
+    char* message = "";
+    arg_str(0, message, 256);
+    printf(message);
     return 0;
 }
 
@@ -29,19 +42,19 @@ uint64 sys_brk()
     old_heap_top = myproc()->heap_top;
 
     if(new_heap_top == 0){
-        printf("堆未改变，堆查询结果：%x\n", old_heap_top);
+        // printf("堆未改变，堆查询结果：%x\n", old_heap_top);
         return old_heap_top;
     }
     else if(new_heap_top > old_heap_top){
         // 需要增大堆空间
         res = uvm_heap_grow(pgtbl, old_heap_top, new_heap_top - old_heap_top);
-        printf("增大的新堆：%x\n", res);
+        // printf("增大的新堆：%x\n", res);
         return res;
     }
     else{
         // 需要缩小堆空间
         res = uvm_heap_ungrow(pgtbl, old_heap_top, old_heap_top - new_heap_top);
-        printf("缩小的新堆：%x\n", res);
+        // printf("缩小的新堆：%x\n", res);
         return res;
     }
 }
@@ -52,6 +65,7 @@ uint64 sys_brk()
 // 成功返回映射空间的起始地址, 失败返回-1
 uint64 sys_mmap()
 {
+    // PS：不用实现，这里直接返回
     return -1;
 }
 
@@ -61,55 +75,69 @@ uint64 sys_mmap()
 // 成功返回0 失败返回-1
 uint64 sys_munmap()
 {
+    // PS：不用实现，这里直接返回
     return -1;
 }
 
-// copyin 测试 (int 数组)
-// uint64 addr
-// uint32 len
-// 返回 0
-uint64 sys_copyin()
+// 实现进程分支
+uint64 sys_fork()
 {
-    proc_t* p = myproc();
-    uint64 addr;
-    uint32 len;
+    return proc_fork();
+}
 
-    arg_uint64(0, &addr);
-    arg_uint32(1, &len);
+// 实现进程的等待
+// uint64 进程的物理地址
+// 成功返回子进程id，失败返回-1
+uint64 sys_wait()
+{
+    uint64 p;
+    arg_uint64(0, &p);
+    return proc_wait(p);
+}
 
-    int tmp;
-    for(int i = 0; i < len; i++) {
-        uvm_copyin(p->pgtbl, (uint64)&tmp, addr + i * sizeof(int), sizeof(int));
-        printf("get a number from user: %d\n", tmp);
+// 实现进程的退出
+// int 退出返回值
+// 将进程以该值退出
+uint64 sys_exit()
+{
+    int n;
+    arg_int(0, &n);
+    proc_exit(n);
+    return 0;  // 这行不会到达
+}
+
+// 实现进程的睡眠
+uint64 sys_sleep()
+{
+    int n;
+    uint64 ticks0;
+
+    arg_int(0, &n);
+    spinlock_acquire(&timer_get()->lk);
+    ticks0 = timer_get_ticks();
+    while(timer_get_ticks() - ticks0 < n){
+        if(proc_killed(myproc())){
+            spinlock_release(&timer_get()->lk);
+            return -1;
+        }
+        proc_sleep(&timer_get()->ticks, &timer_get()->lk);
     }
-
+    spinlock_release(&timer_get()->lk);
     return 0;
 }
 
-// copyout 测试 (int 数组)
-// uint64 addr
-// 返回数组元素数量
-uint64 sys_copyout()
+// 实现进程的杀死
+uint64 sys_kill()
 {
-    int L[5] = {1, 2, 3, 4, 5};
-    proc_t* p = myproc();
-    uint64 addr;
+    int pid;
 
-    arg_uint64(0, &addr);
-    uvm_copyout(p->pgtbl, addr, (uint64)L, sizeof(int) * 5);
-
-    return 5;
+    arg_int(0, &pid);
+    return proc_kill(pid);
 }
 
-// copyinstr测试
-// uint64 addr
-// 成功返回0
-uint64 sys_copyinstr()
+// 实现当前进程编号的获取
+// 返回当前进程编号
+uint64 sys_getpid()
 {
-    char s[64];
-
-    arg_str(0, s, 64);
-    printf("get str from user: %s\n", s);
-
-    return 0;
+    return myproc()->pid;
 }
