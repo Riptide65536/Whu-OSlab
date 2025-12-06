@@ -75,7 +75,7 @@ void external_interrupt_handler()
         case UART_IRQ:
             uart_intr();
             break;
-        case VIRTIO0_IRQ:
+        case VIRTIO_BASE_IRQ:
             // virtio_disk_intr();
             break;
         default:
@@ -98,7 +98,7 @@ void timer_interrupt_handler()
 
     if(mycpuid() == 0){
         timer_update();
-        proc_wakeup(&timer_get()->ticks); // TODO：到底放在哪里？
+        proc_wakeup(&timer_get()->ticks);
     }
     // 通过清除SSIP位，承认软件中断
     w_sip(r_sip() & ~2);

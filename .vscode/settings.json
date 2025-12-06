@@ -23,6 +23,10 @@
         "proc.h": "c",
         "vmem.h": "c",
         "sysnum.h": "c",
-        "random": "c"
+        "random": "c",
+        "thread": "c",
+        "bitmap.h": "c",
+        "buf.h": "c",
+        "fs.h": "c"
     }
 }
