@@ -21,7 +21,7 @@ void start()
     // 把mepc设为main函数的地址
     w_mepc((uint64)main);
 
-    // 关闭所有中断和异常
+    // 委托所有中断和异常至S
     w_medeleg(0xffff);
     w_mideleg(0xffff);
     w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);

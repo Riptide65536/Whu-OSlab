@@ -29,6 +29,9 @@ void   buf_init();
 buf_t* buf_read(uint32 dev, uint32 block_num);
 void   buf_write(buf_t* buf);
 void   buf_release(buf_t* buf);
+
+// 调试用函数
+void   buf_print_single(buf_t* b);
 void   buf_print();
 
 #endif

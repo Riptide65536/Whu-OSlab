@@ -5,6 +5,7 @@
 #include "mem/vmem.h"
 #include "proc/cpu.h"
 #include "proc/initcode.h"
+#include "fs/fs.h"
 #include "memlayout.h"
 #include "riscv.h"
 
@@ -48,9 +49,16 @@ static int allocpid()
 // 释放锁 + 调用 trap_user_return
 static void fork_return()
 {
+    static int first = 1;
     // 由于调度器中上了锁，所以这里需要解锁
     proc_t* p = myproc();
     spinlock_release(&p->lk);
+
+    if (first) {
+        first = 0;
+        fs_init();  // 在首个进程创建的时候初始化文件系统
+    }
+
     trap_user_return();
 }
 

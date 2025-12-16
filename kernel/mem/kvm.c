@@ -49,6 +49,8 @@ void vm_getpteprint(pgtbl_t pgtbl, uint64 va, bool alloc){
 }
 
 pte_t* vm_getpte(pgtbl_t pgtbl, uint64 va, bool alloc){
+    if(pgtbl == NULL)
+        pgtbl = kernel_pagetable;
     for(int level = 2; level > 0; level--) {
         pte_t *pte = &pgtbl[VA_TO_VPN(va, level)];
         if(*pte & PTE_V) {
@@ -145,6 +147,9 @@ pgtbl_t kvm_create(){
     
     // UART 寄存器
     vm_mappages(kpgtbl, UART_BASE, UART_BASE, PGSIZE, PTE_R | PTE_W);
+
+    // Virtio，即磁盘管理
+    vm_mappages(kpgtbl, VIRTIO_BASE, VIRTIO_BASE, PGSIZE, PTE_R | PTE_W);
 
     // CLINT
     vm_mappages(kpgtbl, CLINT_BASE, CLINT_BASE, PGSIZE, PTE_R | PTE_W);

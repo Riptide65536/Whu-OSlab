@@ -69,6 +69,10 @@ buf_t* buf_read(uint32 dev, uint32 block_num)
             b->buf_ref++;
             spinlock_release(&lk_buf_cache);
             sleeplock_acquire(&b->slk);
+
+            //printf("\nRead block(cached)\n");
+            //buf_print_single(b);
+
             return b;
         }
     }
@@ -76,11 +80,16 @@ buf_t* buf_read(uint32 dev, uint32 block_num)
     // 发现block中没有备份，则回收最近最不经常使用的缓冲区（LRU）
     for(b = head_buf.prev; b != &head_buf; b = b->prev){
         if(b->buf_ref == 0) {
+            b->dev = dev;
             b->block_num = block_num;
             b->buf_ref = 1;
             spinlock_release(&lk_buf_cache);
             sleeplock_acquire(&b->slk);
             virtio_disk_rw(b, 0);
+            
+            //printf("\nRead block(not cached)\n");
+            //buf_print_single(b);
+            
             return b;
         }
     }
@@ -93,6 +102,9 @@ void buf_write(buf_t* buf)
 {
     if(!sleeplock_holding(&buf->slk))
         panic("buf_write");
+
+    //printf("\nWrite block:\n");
+    //buf_print_single(buf);
 
     virtio_disk_rw(buf, 1);
 }
@@ -107,10 +119,29 @@ void buf_release(buf_t* buf)
 
     spinlock_acquire(&lk_buf_cache);
     buf->buf_ref--;
+
+    //printf("\nRelease block:\n");
+    //buf_print_single(buf);
+
     if (buf->buf_ref == 0) {
-        insert_head(buf, true);
+        insert_head(buf, false);
     }
     spinlock_release(&lk_buf_cache);
+}
+
+// 输出单个buf的内容
+void buf_print_single(buf_t* b)
+{
+    if(b == &head_buf){
+        printf("The dummy head.\n");
+        return;
+    }
+
+    printf("buf %x: ref = %d, block_num = %d\n",
+        (int)(b - buf_cache), b->buf_ref, b->block_num);
+    for(int i = 0; i < 8; i++)
+        printf("%d ",b->data[i]);
+    printf("\n");
 }
 
 // 输出buf_cache的情况
@@ -121,11 +152,7 @@ void buf_print()
     spinlock_acquire(&lk_buf_cache);
     while(b != &head_buf)
     {
-        printf("buf %x: ref = %d, block_num = %d\n",
-            (int)(b - buf_cache), b->buf_ref, b->block_num);
-        for(int i = 0; i < 8; i++)
-            printf("%d ",b->data[i]);
-        printf("\n");
+        buf_print_single(b);
         b = b->next;
     }
     spinlock_release(&lk_buf_cache);

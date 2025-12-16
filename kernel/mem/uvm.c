@@ -268,3 +268,29 @@ void uvm_copyin_str(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 maxlen)
         src = va0 + PGSIZE;
     }
 }
+
+// Copy to either a user address, or kernel address,
+// depending on usr_dst.
+int either_copyout(bool user_dst, uint64 dst, void *src, uint64 len)
+{
+    struct proc *p = myproc();
+    if(user_dst){
+        uvm_copyout(p->pgtbl, dst, (uint64)src, len);
+    } else {
+        memmove((char *)dst, src, len);
+    }
+    return 0;
+}
+
+// Copy from either a user address, or kernel address,
+// depending on usr_src.
+int either_copyin(void *dst, bool user_src, uint64 src, uint64 len)
+{
+    struct proc *p = myproc();
+    if(user_src){
+        uvm_copyin(p->pgtbl, (uint64)dst, src, len);
+    } else {
+        memmove(dst, (char*)src, len);
+    }
+    return 0;
+}

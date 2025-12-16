@@ -70,4 +70,7 @@ void   uvm_copyin(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len);
 void   uvm_copyout(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 len);
 void   uvm_copyin_str(pgtbl_t pgtbl, uint64 dst, uint64 src, uint32 maxlen);
 
+int   either_copyout(bool user_dst, uint64 dst, void *src, uint64 len);
+int   either_copyin(void *dst, bool user_src, uint64 src, uint64 len);
+
 #endif

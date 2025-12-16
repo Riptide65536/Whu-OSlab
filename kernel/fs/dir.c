@@ -57,12 +57,12 @@ uint32 dir_change(char* path)
 // ps: 调用者需持有pip的锁
 void dir_print(inode_t *pip)
 {
-    assert(sleeplock_holding(&pip->slk), "dir_print: lock");
+    assert(sleeplock_holding(&pip->lock), "dir_print: lock");
 
-    printf("\ninode_num = %d dirents:\n", pip->inode_num);
+    printf("\ninode_num = %d dirents:\n", pip->inum);
 
     dirent_t *de;
-    buf_t *buf = buf_read(pip->addrs[0]);
+    buf_t *buf = buf_read(0, pip->addrs[0]);
     for (uint32 offset = 0; offset < BLOCK_SIZE; offset += sizeof(dirent_t))
     {
         de = (dirent_t *)(buf->data + offset);
@@ -144,7 +144,7 @@ uint32 path_link(char* old_path, char* new_path)
 // 在path_unlink()中调用
 static bool check_unlink(inode_t* ip)
 {
-    assert(sleeplock_holding(&ip->slk), "check_unlink: slk");
+    assert(sleeplock_holding(&ip->lock), "check_unlink: slk");
 
     uint8 tmp[sizeof(dirent_t) * 3];
     uint32 read_len;

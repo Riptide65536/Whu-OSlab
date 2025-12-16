@@ -6,6 +6,7 @@
 #include "proc/cpu.h"
 #include "memlayout.h"
 #include "riscv.h"
+#include "dev/vio.h"
 
 // 中断信息
 char* interrupt_info[16] = {
@@ -76,7 +77,7 @@ void external_interrupt_handler()
             uart_intr();
             break;
         case VIRTIO_BASE_IRQ:
-            // virtio_disk_intr();
+            virtio_disk_intr();
             break;
         default:
             printf("unexpected interrupt irq=%d\n", irq);

@@ -10,6 +10,7 @@
 #define FD_FILE     2
 #define FD_DEVICE   3
 #define FD_PIPE     4
+#define FD_INODE    5
 
 // 文件打开方式 (readable writable)
 
@@ -39,7 +40,7 @@ typedef struct file_state {
 
 #define N_DEV 10    // 设备类型数
 
-#define DEV_CONSOLE 1    // 控制台的主设备号
+#define DEV_CONSOLE 1    // 系统根目录号
 
 // 设备文件需要提供读写接口
 typedef struct dev {
