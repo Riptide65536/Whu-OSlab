@@ -22,5 +22,8 @@ typedef enum {false = 0, true = 1} bool;
 
 #define NCPU 2
 #define NPROC 64
+#define NOFILE       16  // open files per process
+#define NFILE       100  // open files per system
+#define NINODE       50  // maximum number of active i-nodes
 
 #endif

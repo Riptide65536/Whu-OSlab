@@ -2,6 +2,7 @@
 #include "fs/buf.h"
 #include "fs/inode.h"
 #include "fs/dir.h"
+#include "fs/file.h"
 #include "fs/bitmap.h"
 #include "lib/str.h"
 #include "lib/print.h"
@@ -106,10 +107,42 @@ static char *skip_element(char *path, char *name)
 // 失败返回NULL
 static inode_t* search_inode(char* path, char* name, bool find_parent)
 {
-    return 0;
+    inode_t *ip, *next;
+
+    if(*path == '/')
+        ip = inode_get(DEV_CONSOLE, INODE_ROOT);
+    else
+        ip = inode_dup(myproc()->cwd);
+
+    while((path = skip_element(path, name)) != 0){
+        inode_lock(ip);
+        if(ip->type != FT_DIR){
+            inode_unlock_free(ip);
+            return 0;
+        }
+        if(find_parent && *path == '\0'){
+            // Stop one level early.
+            inode_unlock(ip);
+            return ip;
+        }
+        if((next = NULL) == 0){
+            // TODO???
+            // WTF IS THAT?
+            inode_unlock_free(ip);
+            return 0;
+        }
+        inode_unlock_free(ip);
+        ip = next;
+    }
+    if(find_parent){
+        inode_free(ip);
+        return 0;
+    }
+    return ip;
 }
 
 // 找到path对应的inode
+// 相当于namei
 inode_t* path_to_inode(char* path)
 {
     char name[DIR_NAME_LEN];
@@ -118,6 +151,7 @@ inode_t* path_to_inode(char* path)
 
 // 找到path对应的inode的父节点
 // path最后的目录名放入name指向的空间
+// 相当于namiparent
 inode_t* path_to_pinode(char* path, char* name)
 {
     return search_inode(path, name, true);

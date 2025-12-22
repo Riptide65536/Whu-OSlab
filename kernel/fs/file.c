@@ -41,6 +41,7 @@ file_t* file_alloc()
 }
 
 // 创建设备文件(供proczero创建console)
+// TODO：在xv6中没有
 file_t* file_create_dev(char* path, uint16 major, uint16 minor)
 {
     return 0;
@@ -49,7 +50,65 @@ file_t* file_create_dev(char* path, uint16 major, uint16 minor)
 // 打开一个文件
 file_t* file_open(char* path, uint32 open_mode)
 {
-    return 0;
+    int fd;
+    struct file *f;
+    struct inode *ip;
+    int n;
+
+    //begin_op();
+
+    if(open_mode & O_CREATE){
+        ip = file_create(path, FT_FILE, 0, 0);
+        if(ip == 0){
+        //end_op();
+        return -1;
+        }
+    } else {
+        if((ip = namei(path)) == 0){
+        //end_op();
+        return -1;
+        }
+        ilock(ip);
+        if(ip->type == FT_DIR && open_mode != O_RDONLY){
+        iunlockput(ip);
+        //end_op();
+        return -1;
+        }
+    }
+
+    if(ip->type == FT_DEVICE && (ip->major < 0 || ip->major >= N_DEV)){
+        iunlockput(ip);
+        //end_op();
+        return -1;
+    }
+
+    if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+        if(f)
+        fileclose(f);
+        iunlockput(ip);
+        //end_op();
+        return -1;
+    }
+
+    if(ip->type == FT_DEVICE){
+        f->type = FD_DEVICE;
+        f->major = ip->major;
+    } else {
+        f->type = FD_INODE;
+        f->off = 0;
+    }
+    f->ip = ip;
+    f->readable = !(open_mode & O_WRONLY);
+    f->writable = (open_mode & O_WRONLY) || (open_mode & O_RDWR);
+
+    if((open_mode & O_TRUNC) && ip->type == FT_FILE){
+        itrunc(ip);
+    }
+
+    iunlock(ip);
+    end_op();
+
+    return fd;
 }
 
 // 释放一个file
@@ -73,7 +132,7 @@ void file_close(file_t* f)
         // pipeclose(ff.pipe, ff.writable);
     } else if(ff.type == FD_INODE || ff.type == FD_DEVICE){
         // begin_op();
-        // iput(ff.ip);
+        inode_free(ff.ip);
         // end_op();
     }
 }
@@ -82,26 +141,26 @@ void file_close(file_t* f)
 // 返回读取到的字节数
 uint32 file_read(file_t* f, uint32 len, uint64 dst, bool user)
 {
+    // TODO：很怪，基本上跟xv6的不一样。
     int r = 0;
 
     if(f->readable == 0)
         return -1;
 
-    /*
     if(f->type == FD_PIPE){
-        r = piperead(f->pipe, addr, n);
+        // r = piperead(f->pipe, addr, n);
     } else if(f->type == FD_DEVICE){
-        if(f->major < 0 || f->major >= NDEV || !devsw[f->major].read)
+        if(f->major < 0 || f->major >= N_DEV || !devlist[f->major].read)
             return -1;
-        r = devsw[f->major].read(1, addr, n);
+        r = devlist[f->major].read(1, dst, user);
     } else if(f->type == FD_INODE){
-        ilock(f->ip);
-        if((r = readi(f->ip, 1, addr, f->off, n)) > 0)
-            f->off += r;
-        iunlock(f->ip);
+        inode_lock(f->ip);
+        if((r = inode_read_data(f->ip, f->offset, len, (void*)dst, user)) > 0)
+            f->offset += r;
+        inode_unlock(f->ip);
     } else {
         panic("fileread");
-    }*/
+    }
 
     r = 0;
 
@@ -110,20 +169,20 @@ uint32 file_read(file_t* f, uint32 len, uint64 dst, bool user)
 
 // 文件内容写入
 // 返回写入的字节数
-uint32 file_write(file_t* file, uint32 len, uint64 src, bool user)
+uint32 file_write(file_t* f, uint32 len, uint64 src, bool user)
 {
+    // TODO：还是太怪了！！
 
-    /*
     int r, ret = 0;
 
     if(f->writable == 0)
         return -1;
     if(f->type == FD_PIPE){
-        ret = pipewrite(f->pipe, addr, n);
+        // ret = pipewrite(f->pipe, addr, n);
     } else if(f->type == FD_DEVICE){
-        if(f->major < 0 || f->major >= NDEV || !devsw[f->major].write)
+        if(f->major < 0 || f->major >= N_DEV || !devlist[f->major].write)
         return -1;
-        ret = devsw[f->major].write(1, addr, n);
+        ret = devlist[f->major].write(1, src, user);
     } else if(f->type == FD_INODE){
         // write a few blocks at a time to avoid exceeding
         // the maximum log transaction size, including
@@ -131,32 +190,31 @@ uint32 file_write(file_t* file, uint32 len, uint64 src, bool user)
         // and 2 blocks of slop for non-aligned writes.
         // this really belongs lower down, since writei()
         // might be writing a device like the console.
-        int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+        int max = ((MAXOPBLOCKS-1-1-2) / 2) * BLOCK_SIZE;
         int i = 0;
-        while(i < n){
-        int n1 = n - i;
-        if(n1 > max)
-            n1 = max;
+        while(i < len){
+            int n1 = len - i;
+            if(n1 > max) n1 = max;
 
-        begin_op();
-        ilock(f->ip);
-        if ((r = writei(f->ip, 1, addr + i, f->off, n1)) > 0)
-            f->off += r;
-        iunlock(f->ip);
-        end_op();
+            //begin_op();
+            inode_lock(f->ip);
+            if ((r = inode_write_data(f->ip, 1,f->offset, (void*)(src + i), n1)) > 0)
+                f->offset += r;
+            inode_unlock(f->ip);
+            //end_op();
 
-        if(r != n1){
-            // error from writei
-            break;
+            if(r != n1){
+                // error from writei
+                break;
+            }
+            i += r;
         }
-        i += r;
-        }
-        ret = (i == n ? n : -1);
+        ret = (i == len ? len : -1);
     } else {
         panic("filewrite");
-    }*/
+    }
 
-    return 0;
+    return ret;
 }
 
 // flags 可能取值
@@ -167,7 +225,25 @@ uint32 file_write(file_t* file, uint32 len, uint64 src, bool user)
 // 修改file->offset (只针对FD_FILE类型的文件)
 uint32 file_lseek(file_t* file, uint32 offset, int flags)
 {
-    return 0;
+    if(file->type == FD_FILE){
+        switch (flags)
+        {
+        case LSEEK_SET:
+            file->offset = offset;
+            break;
+        case LSEEK_ADD:
+            file->offset += offset;
+            break;
+        case LSEEK_SUB:
+            file->offset -= offset;
+            break;
+        default:
+            break;
+        }
+        return file->offset;
+    }
+    printf("Warning: file type not right!");
+    return -1;
 }
 
 // file->ref++ with lock

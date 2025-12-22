@@ -3,6 +3,8 @@
 
 #include "common.h"
 #include "lib/lock.h"
+#include "fs/file.h"
+#include "fs/inode.h"
 
 // 页表类型定义
 typedef uint64* pgtbl_t;
@@ -110,6 +112,9 @@ typedef struct proc {
 
     uint64 kstack;           // 内核栈的虚拟地址
     context_t ctx;           // 内核态进程上下文
+
+    file_t *ofile[NOFILE];  // 打开的文件
+    inode_t *cwd;           // 当前的目录
 } proc_t;
 
 

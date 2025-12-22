@@ -14,9 +14,11 @@
 
 // 文件打开方式 (readable writable)
 
-#define MODE_CREATE    0x1 // 文件不存在则创建
-#define MODE_READ      0x2 // 读文件
-#define MODE_WRITE     0x4 // 写文件
+#define O_RDONLY  0x000
+#define O_WRONLY  0x001
+#define O_RDWR    0x002
+#define O_CREATE  0x200
+#define O_TRUNC   0x400
 
 typedef struct inode inode_t;
 
@@ -41,6 +43,8 @@ typedef struct file_state {
 #define N_DEV 10    // 设备类型数
 
 #define DEV_CONSOLE 1    // 系统根目录号
+
+#define MAXOPBLOCKS  10  // max # of blocks any FS op writes
 
 // 设备文件需要提供读写接口
 typedef struct dev {
