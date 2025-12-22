@@ -1,50 +1,85 @@
-include common.mk
+TOOLCHAIN = riscv64-unknown-elf-
 
-KERN = kernel
-USER = user
-MKFS = mkfs
-KERNEL_ELF = kernel-qemu
-CPUNUM = 1
+GDB = gdb-multiarch
+
 FS_IMG = fs.img
+CPUNUM = 1
 
-.PHONY: clean $(KERN) $(USER) $(MKFS)
+CC = $(TOOLCHAIN)gcc
+LD = $(TOOLCHAIN)ld
+OBJCOPY = $(TOOLCHAIN)objcopy
+OBJDUMP = $(TOOLCHAIN)objdump
 
-$(KERN):
-	$(MAKE) build --directory=$@
+CFLAGS = -Wall -Werror -O0 -fno-omit-frame-pointer -ggdb -MD
+CFLAGS += -ffreestanding -nostdlib -mno-relax -mcmodel=medany
+CFLAGS += -Iinclude
 
-$(USER):
-	$(MAKE) init --directory=$@
+LDFLAGS = -T kernel/kernel.ld -nostdlib
 
-$(MKFS):
-	$(MAKE) build --directory=$@
-	$(MKFS)/mkfs $(FS_IMG)
+USER_INITCODE = user/initcode
+INITCODE_H = include/proc/initcode.h
 
-# QEMU相关配置
-QEMU     =  qemu-system-riscv64
-QEMUOPTS =  -machine virt -bios none -kernel $(KERNEL_ELF) 
-QEMUOPTS += -m 128M -smp $(CPUNUM) -nographic
-QEMUOPTS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
-QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+# 查找所有文件，其中entry.S被单独处理
+ENTRY_S = kernel/boot/entry.S
+SOURCES_S_OTHER = $(filter-out $(ENTRY_S), $(shell find kernel -name '*.S'))
+SOURCES_C = $(shell find kernel -name '*.c')
 
-# 调试
-GDBPORT = $(shell expr `id -u` % 5000 + 25000)
-QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
-	then echo "-gdb tcp::$(GDBPORT)"; \
-	else echo "-s -p $(GDBPORT)"; fi)
+# 转换 .o 文件
+OBJECT_ENTRY = $(patsubst %.S, %.o, $(ENTRY_S))
+OBJECTS_S_OTHER = $(patsubst %.S, %.o, $(SOURCES_S_OTHER))
+OBJECTS_C = $(patsubst %.c, %.o, $(SOURCES_C))
 
-build: $(USER) $(KERN) $(MKFS)
+# 确保 OBJECT_ENTRY (entry.o) 在链接顺序的最前面
+OBJECTS = $(OBJECT_ENTRY) $(OBJECTS_S_OTHER) $(OBJECTS_C)
+DEPS = $(patsubst %.o, %.d, $(OBJECTS))
+TARGET_ELF = kernel-qemu
 
-# qemu运行
-qemu: $(USER) $(KERN) $(MKFS)
-	$(QEMU) $(QEMUOPTS)
+QEMU_OPTS = -machine virt -bios none -kernel $(TARGET_ELF) -nographic
+QEMU_OPTS += -m 128M -smp $(CPUNUM) -nographic
+QEMU_OPTS += -drive file=$(FS_IMG),if=none,format=raw,id=x0
+QEMU_OPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 
-.gdbinit: .gdbinit.tmpl-riscv
-	sed "s/:1234/:$(GDBPORT)/" < $^ > $@
+.PHONY: all clean qemu qemu-gdb
 
-qemu-gdb: $(USER) $(KERN) $(MKFS) .gdbinit
-	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+all: userinit $(TARGET_ELF)
+
+# 用户程序编译目标
+userinit: $(INITCODE_H)
+
+$(INITCODE_H): $(USER_INITCODE).c
+	@echo "user code compiling..."
+	$(CC) $(CFLAGS) -march=rv64g -nostdinc -Os -c $(USER_INITCODE).c -o $(USER_INITCODE).o
+	$(LD) -N -e main -Ttext 0 -o $(USER_INITCODE).out $(USER_INITCODE).o
+	$(OBJCOPY) -S -O binary $(USER_INITCODE).out $(USER_INITCODE)
+	xxd -i $(USER_INITCODE) > ./include/proc/initcode.h
+	rm -f $(USER_INITCODE) $(USER_INITCODE).o $(USER_INITCODE).out $(USER_INITCODE).d
+
+$(TARGET_ELF): $(OBJECTS)
+	$(LD) $(LDFLAGS) -o $@ $^
+
+%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.S
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	$(MAKE) --directory=$(KERN) clean
-	$(MAKE) --directory=$(MKFS) clean
-	rm -f $(KERNEL_ELF) $(FS_IMG) .gdbinit
+	rm -rf $(TARGET_ELF) $(shell find kernel -name '*.o' -o -name '*.d')
+
+qemu: $(TARGET_ELF)
+	@echo "Starting QEMU..."
+	@qemu-system-riscv64 $(QEMU_OPTS)
+
+qemu-gdb: $(TARGET_ELF)
+	@echo "Starting QEMU for GDB debugging..."
+	@qemu-system-riscv64 $(QEMU_OPTS) -S -s
+
+debug: $(TARGET_ELF)
+	@tmux kill-session -t kernel_debug 2>/dev/null || true
+	@tmux new-session -d -s kernel_debug "make qemu-gdb" \; \
+		split-window -h "sleep 1; $(GDB) -ex 'target remote localhost:1234' $(TARGET_ELF)" \; \
+		attach-session -t kernel_debug
+
+-include $(DEPS)

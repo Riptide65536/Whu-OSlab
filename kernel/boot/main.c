@@ -6,9 +6,9 @@
 #include "mem/vmem.h"
 #include "proc/proc.h"
 #include "trap/trap.h"
-#include "fs/buf.h"
-#include "fs/inode.h"
 #include "fs/file.h"
+#include "fs/bio.h"
+#include "fs/fs.h"
 #include "dev/vio.h"
 
 volatile static int started = 0;
@@ -26,10 +26,8 @@ void main()
         trap_kernel_inithart();
         plic_init();
         plic_inithart();
-        buf_init();
-        inode_init();
-        // file_init();     
-        virtio_disk_init();
+        fs_init(ROOTDEV);
+        file_init();
         proc_make_first();
 
         printf("cpu %d is booting!\n", cpuid);

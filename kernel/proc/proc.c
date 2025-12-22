@@ -49,16 +49,9 @@ static int allocpid()
 // 释放锁 + 调用 trap_user_return
 static void fork_return()
 {
-    static int first = 1;
     // 由于调度器中上了锁，所以这里需要解锁
     proc_t* p = myproc();
     spinlock_release(&p->lk);
-
-    if (first) {
-        first = 0;
-        fs_init();  // 在首个进程创建的时候初始化文件系统
-    }
-
     trap_user_return();
 }
 
@@ -189,7 +182,7 @@ void proc_mapstacks(pgtbl_t kpgtbl)
     ustack      (1 page)
     .......
                         <--heap_top
-    code + data (1 page)
+    code + data (? page) 可能随测试代码的页数而变化
     empty space (1 page) 最低的4096字节 不分配物理页，同时不可访问
 */
 void proc_make_first()
@@ -206,24 +199,38 @@ void proc_make_first()
     // ustack 映射 + 设置 ustack_pages
     // proc_mapstacks已经完成了栈的设置和映射
     proczero->kstack = KSTACK(0);
-    uint64 ustack_phys = (uint64)pmem_alloc(true);
+    uint64 ustack_phys = (uint64)pmem_alloc(false);
     vm_mappages(proczero->pgtbl, proczero->kstack - PGSIZE, ustack_phys, PGSIZE, 
                 PTE_R | PTE_W | PTE_U);
     
     // data + code 映射
-    assert(initcode_len <= PGSIZE, "proc_make_first: initcode too big\n");
-    char *mem = (char *)pmem_alloc(false);
-    memset(mem, 0, PGSIZE);
-    vm_mappages(proczero->pgtbl, 0, (uint64)mem, PGSIZE, PTE_W|PTE_R|PTE_X|PTE_U);
-    memmove(mem, initcode, initcode_len);
-    proczero->ustack_pages = 1;
+
+    // 在这里尝试多page映射以摆脱限制...
+    proczero->ustack_pages = 0;
+    for(uint64 addr = 0; addr < user_initcode_len; addr += PGSIZE)
+    {
+        char *mem = (char *)pmem_alloc(false);
+        if (mem == NULL) {
+            // 处理分配失败
+            panic("proc_make_first: pmem_alloc failed");
+        }
+
+        memset(mem, 0, PGSIZE);
+
+        uint64 remaining = user_initcode_len - addr;
+        uint64 copy_size = (remaining > PGSIZE) ? PGSIZE : remaining;
+
+        vm_mappages(proczero->pgtbl, addr, (uint64)mem, PGSIZE, PTE_W|PTE_R|PTE_X|PTE_U);
+        memmove(mem, user_initcode + addr, copy_size);
+        proczero->ustack_pages++;
+    }
 
     // 设置 heap_top
-    proczero->heap_top = PGSIZE;
+    proczero->heap_top = proczero->ustack_pages * PGSIZE;
 
     // 设置用户态返回时的关键寄存器
     proczero->tf->epc = 0; // 程序计数器，从虚拟地址0开始执行initcode
-    proczero->tf->sp = PGSIZE; // 用户栈指针，设置在用户空间顶部
+    proczero->tf->sp = proczero->ustack_pages * PGSIZE; // 用户栈指针，设置在用户空间顶部
 
     // 修改其状态并释放该锁
     proczero->state = RUNNABLE;

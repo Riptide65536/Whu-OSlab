@@ -13,5 +13,6 @@ void arg_int(int n, int* ip);
 void arg_uint32(int n, uint32* ip);
 void arg_uint64(int n, uint64* ip);
 void arg_str(int n, char* buf, int maxlen);
+int  arg_fd(int n, int *pfd, struct File **pf);
 
 #endif

@@ -141,3 +141,14 @@ uint64 sys_getpid()
 {
     return myproc()->pid;
 }
+
+uint64 sys_yield()
+{
+    proc_yield();
+    return 0;
+}
+
+uint64 sys_getticks()
+{
+    return timer_get_ticks();
+}

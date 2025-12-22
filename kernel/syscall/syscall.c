@@ -11,14 +11,23 @@ static uint64 (*syscalls[])(void) = {
     [SYS_test]          sys_test,
     [SYS_print]         sys_print,
     [SYS_brk]           sys_brk,
-    [SYS_mmap]          sys_mmap,
-    [SYS_munmap]        sys_munmap,
+    [SYS_open]          sys_open,
+    [SYS_close]         sys_close,
     [SYS_fork]          sys_fork,
     [SYS_wait]          sys_wait,
     [SYS_exit]          sys_exit,
     [SYS_sleep]         sys_sleep,
     [SYS_kill]          sys_kill,
     [SYS_getpid]        sys_getpid,
+    [SYS_read]          sys_read,
+    [SYS_write]         sys_write,
+    [SYS_mkdir]         sys_mkdir,
+    [SYS_link]          sys_link,
+    [SYS_unlink]        sys_unlink,
+    [SYS_fstat]         sys_fstat,
+    [SYS_dup]           sys_dup,
+    [SYS_yield]         sys_yield,
+    [SYS_getticks]      sys_getticks,
 };
 
 // 定长数组的宏定义
@@ -98,4 +107,18 @@ void arg_str(int n, char* buf, int maxlen)
     arg_uint64(n, &addr);
 
     uvm_copyin_str(p->pgtbl, (uint64)buf, addr, maxlen);
+}
+
+int arg_fd(int n, int *pfd, struct File **pf) {
+    int fd;
+    struct File *f;
+    
+    arg_int(n, &fd);
+    if(fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    if(pfd)
+        *pfd = fd;
+    if(pf)
+        *pf = f;
+    return 0;
 }

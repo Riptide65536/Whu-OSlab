@@ -16,6 +16,8 @@ typedef unsigned long long     uint64;
 typedef unsigned long long         reg; 
 typedef enum {false = 0, true = 1} bool;
 
+typedef void* addr_t;
+
 #ifndef NULL
 #define NULL ((void*)0)
 #endif
@@ -24,6 +26,6 @@ typedef enum {false = 0, true = 1} bool;
 #define NPROC 64
 #define NOFILE       16  // open files per process
 #define NFILE       100  // open files per system
-#define NINODE       50  // maximum number of active i-nodes
+#define NINODE      100  // maximum number of active i-nodes
 
 #endif
