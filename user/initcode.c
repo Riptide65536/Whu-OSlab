@@ -66,11 +66,6 @@ static void cleanup_test_artifacts(void) {
 }
 
 int main() {
-    // 测试以下套包哪里来的（汗
-    print( "line 1\n");
-    print( "line 2\n");
-    print( "line 3\n");
-
     print( "=== main() ===\n\n" );
 
     int fd;
